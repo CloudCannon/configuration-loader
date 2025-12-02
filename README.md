@@ -1,4 +1,4 @@
-# @cloudcannon/configuration-loader
+# CloudCannon Configuration Loader
 
 Load and merge CloudCannon configuration files that have been split across multiple files.
 
