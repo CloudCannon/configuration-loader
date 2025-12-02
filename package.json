@@ -1,0 +1,68 @@
+{
+  "name": "@cloudcannon/configuration-loader",
+  "version": "0.1.0",
+  "description": "Load and merge CloudCannon configuration files",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      }
+    },
+    "./browser": {
+      "import": {
+        "types": "./dist/browser.d.ts",
+        "default": "./src/browser.ts"
+      }
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "src",
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build:types": "tsc --emitDeclarationOnly",
+    "build": "npm run build:types",
+    "test": "node --experimental-strip-types --test src/**/*.test.ts",
+    "test:coverage": "node --experimental-strip-types --experimental-test-coverage --test src/**/*.test.ts",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "format": "biome format --write src/",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cloudcannon",
+    "configuration",
+    "cms",
+    "static-site"
+  ],
+  "author": "CloudCannon",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CloudCannon/configuration-loader.git"
+  },
+  "homepage": "https://cloudcannon.com/documentation/articles/why-split-your-configuration-file/",
+  "dependencies": {
+    "@cloudcannon/configuration-types": "^0.0.43"
+  },
+  "peerDependencies": {
+    "js-yaml": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "js-yaml": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.8",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
