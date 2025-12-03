@@ -47,7 +47,7 @@ async function createDefaultParser(): Promise<(contents: string, filePath: strin
 		if (filePath.endsWith('.yml') || filePath.endsWith('.yaml')) {
 			if (!yamlParse) {
 				throw new Error(
-					`Cannot parse YAML file "${filePath}". Install js-yaml: npm install js-yaml`,
+					`Cannot parse YAML file "${filePath}". Install js-yaml: npm install js-yaml`
 				);
 			}
 			return yamlParse(contents);
@@ -61,7 +61,7 @@ async function createDefaultParser(): Promise<(contents: string, filePath: strin
 				return yamlParse(contents);
 			}
 			throw new Error(
-				`Cannot parse file "${filePath}". Install js-yaml for YAML support: npm install js-yaml`,
+				`Cannot parse file "${filePath}". Install js-yaml for YAML support: npm install js-yaml`
 			);
 		}
 	};
@@ -90,7 +90,7 @@ async function createDefaultParser(): Promise<(contents: string, filePath: strin
  */
 export async function loadConfiguration(
 	configPath: string,
-	options?: LoadConfigurationOptions,
+	options?: LoadConfigurationOptions
 ): Promise<GlobResult> {
 	const parseFile = options?.parseFile ?? (await createDefaultParser());
 	const absoluteConfigPath = resolve(configPath);
