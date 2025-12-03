@@ -40,18 +40,18 @@ describe('mergeConfiguration', () => {
 
 		const result = await mergeConfiguration(config, {
 			findFilesMatchingGlobs: () => Object.keys(mockFiles),
-			loadConfigFile: async (path) => mockFiles[path],
+			loadConfigFile: async (path: string) => mockFiles[path],
 		});
 
 		assert.ok(result.config.collections_config);
 		assert.equal(Object.keys(result.config.collections_config).length, 2);
 		assert.equal(
 			(result.config.collections_config as Record<string, { path?: string }>).posts?.path,
-			'content/posts',
+			'content/posts'
 		);
 		assert.equal(
 			(result.config.collections_config as Record<string, { path?: string }>).pages?.path,
-			'content/pages',
+			'content/pages'
 		);
 	});
 
@@ -69,7 +69,7 @@ describe('mergeConfiguration', () => {
 
 		const result = await mergeConfiguration(config, {
 			findFilesMatchingGlobs: () => Object.keys(mockFiles),
-			loadConfigFile: async (path) => mockFiles[path],
+			loadConfigFile: async (path: string) => mockFiles[path],
 		});
 
 		assert.ok(result.config._inputs);
@@ -90,7 +90,7 @@ describe('mergeConfiguration', () => {
 
 		assert.deepEqual(
 			result.globPatterns.sort(),
-			['/.cloudcannon/collections/*.yml', '/.cloudcannon/inputs/*.yml'].sort(),
+			['/.cloudcannon/collections/*.yml', '/.cloudcannon/inputs/*.yml'].sort()
 		);
 	});
 
@@ -121,7 +121,7 @@ describe('mergeConfiguration', () => {
 
 		const result = await mergeConfiguration(config, {
 			findFilesMatchingGlobs: () => Object.keys(mockFiles),
-			loadConfigFile: async (path) => mockFiles[path],
+			loadConfigFile: async (path: string) => mockFiles[path],
 		});
 
 		assert.equal(result.warnings.arrayValues.length, 1);
@@ -140,7 +140,7 @@ describe('mergeConfiguration', () => {
 
 		const result = await mergeConfiguration(config, {
 			findFilesMatchingGlobs: () => Object.keys(mockFiles),
-			loadConfigFile: async (path) => mockFiles[path],
+			loadConfigFile: async (path: string) => mockFiles[path],
 		});
 
 		assert.equal(result.warnings.multipleGlobKeys.length, 1);
@@ -160,7 +160,7 @@ describe('mergeConfiguration', () => {
 
 		const result = await mergeConfiguration(config, {
 			findFilesMatchingGlobs: () => Object.keys(mockFiles),
-			loadConfigFile: async (path) => mockFiles[path],
+			loadConfigFile: async (path: string) => mockFiles[path],
 		});
 
 		assert.ok(result.config._inputs);
@@ -181,15 +181,15 @@ describe('mergeConfiguration', () => {
 
 		const result = await mergeConfiguration(config, {
 			findFilesMatchingGlobs: () => Object.keys(mockFiles),
-			loadConfigFile: async (path) => mockFiles[path],
+			loadConfigFile: async (path: string) => mockFiles[path],
 		});
 
 		assert.equal(
 			result.pathsToGlobKey['/.cloudcannon/collections/posts.yml'],
-			'collections_config_from_glob',
+			'collections_config_from_glob'
 		);
 		assert.ok(
-			result.globKeyToPaths.collections_config_from_glob.has('/.cloudcannon/collections/posts.yml'),
+			result.globKeyToPaths.collections_config_from_glob.has('/.cloudcannon/collections/posts.yml')
 		);
 	});
 
@@ -229,7 +229,7 @@ describe('mergeConfiguration', () => {
 
 		const result = await mergeConfiguration(config, {
 			findFilesMatchingGlobs: () => Object.keys(mockFiles),
-			loadConfigFile: async (path) => mockFiles[path],
+			loadConfigFile: async (path: string) => mockFiles[path],
 		});
 
 		const postsConfig = result.config.collections_config?.posts as Record<string, unknown>;
@@ -262,7 +262,7 @@ describe('GlobResult types', () => {
 			{
 				findFilesMatchingGlobs: () => [],
 				loadConfigFile: async () => ({}),
-			},
+			}
 		);
 
 		// Type checking - these assertions verify the shape
@@ -314,7 +314,7 @@ describe('warnings', () => {
 
 			const result = await mergeConfiguration(config, {
 				findFilesMatchingGlobs: () => Object.keys(mockFiles),
-				loadConfigFile: async (path) => mockFiles[path],
+				loadConfigFile: async (path: string) => mockFiles[path],
 			});
 
 			assert.equal(result.warnings.cycles.length, 1);
@@ -349,7 +349,7 @@ describe('warnings', () => {
 
 			const result = await mergeConfiguration(config, {
 				findFilesMatchingGlobs: () => ['/.cloudcannon/structures/a.yml'],
-				loadConfigFile: async (path) => mockFiles[path],
+				loadConfigFile: async (path: string) => mockFiles[path],
 			});
 
 			assert.equal(result.warnings.cycles.length, 1);
@@ -386,7 +386,7 @@ describe('warnings', () => {
 			};
 
 			const result = await mergeConfiguration(config, {
-				findFilesMatchingGlobs: (globs) => {
+				findFilesMatchingGlobs: (globs: string[]) => {
 					if (globs.includes('/.cloudcannon/structures/a.yml')) {
 						return ['/.cloudcannon/structures/a.yml'];
 					}
@@ -395,7 +395,7 @@ describe('warnings', () => {
 					}
 					return [];
 				},
-				loadConfigFile: async (path) => mockFiles[path],
+				loadConfigFile: async (path: string) => mockFiles[path],
 			});
 
 			assert.equal(result.warnings.cycles.length, 0);
@@ -415,7 +415,7 @@ describe('warnings', () => {
 
 			const result = await mergeConfiguration(config, {
 				findFilesMatchingGlobs: () => Object.keys(mockFiles),
-				loadConfigFile: async (path) => mockFiles[path],
+				loadConfigFile: async (path: string) => mockFiles[path],
 			});
 
 			assert.equal(result.warnings.multipleGlobKeys.length, 1);
@@ -435,7 +435,7 @@ describe('warnings', () => {
 
 			const result = await mergeConfiguration(config, {
 				findFilesMatchingGlobs: () => ['/.cloudcannon/inputs/seo.yml'],
-				loadConfigFile: async (path) => mockFiles[path],
+				loadConfigFile: async (path: string) => mockFiles[path],
 			});
 
 			assert.equal(result.warnings.multipleGlobKeys.length, 0);
@@ -453,7 +453,7 @@ describe('warnings', () => {
 
 			const result = await mergeConfiguration(config, {
 				findFilesMatchingGlobs: () => Object.keys(mockFiles),
-				loadConfigFile: async (path) => mockFiles[path],
+				loadConfigFile: async (path: string) => mockFiles[path],
 			});
 
 			// File should only be processed for the first glob key type
@@ -479,7 +479,7 @@ describe('warnings', () => {
 
 			const result = await mergeConfiguration(config, {
 				findFilesMatchingGlobs: () => Object.keys(mockFiles),
-				loadConfigFile: async (path) => mockFiles[path],
+				loadConfigFile: async (path: string) => mockFiles[path],
 			});
 
 			assert.equal(result.warnings.arrayValues.length, 1);
@@ -498,7 +498,7 @@ describe('warnings', () => {
 
 			const result = await mergeConfiguration(config, {
 				findFilesMatchingGlobs: () => Object.keys(mockFiles),
-				loadConfigFile: async (path) => mockFiles[path],
+				loadConfigFile: async (path: string) => mockFiles[path],
 			});
 
 			// Valid file should be merged
@@ -519,7 +519,7 @@ describe('warnings', () => {
 
 			const result = await mergeConfiguration(config, {
 				findFilesMatchingGlobs: () => Object.keys(mockFiles),
-				loadConfigFile: async (path) => mockFiles[path],
+				loadConfigFile: async (path: string) => mockFiles[path],
 			});
 
 			assert.equal(result.warnings.arrayValues.length, 2);

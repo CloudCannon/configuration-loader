@@ -35,7 +35,7 @@ class ConfigurationLoader {
 
 	constructor(
 		findFilesMatchingGlobs: (globs: string[]) => string[],
-		loadConfigFile: (filePath: string) => Promise<unknown>,
+		loadConfigFile: (filePath: string) => Promise<unknown>
 	) {
 		this.warnings = {
 			cycles: [],
@@ -68,19 +68,19 @@ class ConfigurationLoader {
 			config,
 			'_snippets_templates_from_glob',
 			'_snippets_templates',
-			false,
+			false
 		);
 		await this.importFromGlobKey(
 			config,
 			'_snippets_definitions_from_glob',
 			'_snippets_definitions',
-			false,
+			false
 		);
 		await this.importFromGlobKey(
 			config,
 			'collections_config_from_glob',
 			'collections_config',
-			false,
+			false
 		);
 		await this.importFromGlobKey(config, '_inputs_from_glob', '_inputs', false);
 		await this.importFromGlobKey(config, '_structures_from_glob', '_structures', false);
@@ -103,26 +103,26 @@ class ConfigurationLoader {
 						collection as Record<string, unknown>,
 						'_inputs_from_glob',
 						'_inputs',
-						false,
+						false
 					);
 					await this.importFromGlobKey(
 						collection as Record<string, unknown>,
 						'_structures_from_glob',
 						'_structures',
-						false,
+						false
 					);
 
 					await this.processInputsKey(
-						(collection as Record<string, unknown>)._inputs as Configuration['_inputs'],
+						(collection as Record<string, unknown>)._inputs as Configuration['_inputs']
 					);
 					await this.processStructuresKey(
-						(collection as Record<string, unknown>)._structures as Configuration['_structures'],
+						(collection as Record<string, unknown>)._structures as Configuration['_structures']
 					);
 
 					// Process recursive globs in schemas
 					if (isObject((collection as Record<string, unknown>).schemas)) {
 						for (const schemaValue of Object.values(
-							(collection as Record<string, unknown>).schemas as Record<string, unknown>,
+							(collection as Record<string, unknown>).schemas as Record<string, unknown>
 						)) {
 							if (isObject(schemaValue)) {
 								await this.importFromGlobKey(schemaValue, '_inputs_from_glob', '_inputs', false);
@@ -130,12 +130,12 @@ class ConfigurationLoader {
 									schemaValue,
 									'_structures_from_glob',
 									'_structures',
-									false,
+									false
 								);
 
 								await this.processInputsKey(schemaValue._inputs as Configuration['_inputs']);
 								await this.processStructuresKey(
-									schemaValue._structures as Configuration['_structures'],
+									schemaValue._structures as Configuration['_structures']
 								);
 							}
 						}
@@ -155,12 +155,12 @@ class ConfigurationLoader {
 						snippetConfig,
 						'_structures_from_glob',
 						'_structures',
-						false,
+						false
 					);
 
 					await this.processInputsKey(snippetConfig._inputs as Configuration['_inputs']);
 					await this.processStructuresKey(
-						snippetConfig._structures as Configuration['_structures'],
+						snippetConfig._structures as Configuration['_structures']
 					);
 				}
 			}
@@ -176,7 +176,7 @@ class ConfigurationLoader {
 	 */
 	private async processInputsKey(
 		inputs: Configuration['_inputs'],
-		visited?: Set<string>,
+		visited?: Set<string>
 	): Promise<void> {
 		if (inputs && isObject(inputs)) {
 			for (const inputValue of Object.values(inputs)) {
@@ -193,15 +193,15 @@ class ConfigurationLoader {
 								'values_from_glob',
 								'values',
 								true,
-								visitedLocal,
+								visitedLocal
 							);
 						}
 
 						if (Array.isArray(structures.values)) {
 							await Promise.all(
 								structures.values.map(async (value: StructureValue) =>
-									this.processStructureValue(value, visitedLocal),
-								),
+									this.processStructureValue(value, visitedLocal)
+								)
 							);
 						}
 					}
@@ -212,7 +212,7 @@ class ConfigurationLoader {
 
 	private async processStructuresKey(
 		structures: Configuration['_structures'],
-		visited?: Set<string>,
+		visited?: Set<string>
 	): Promise<void> {
 		if (!structures || !isObject(structures)) {
 			return;
@@ -230,17 +230,17 @@ class ConfigurationLoader {
 				if (structure.values && Array.isArray(structure.values)) {
 					await Promise.all(
 						structure.values.map(async (value) =>
-							this.processStructureValue(value as StructureValue, visitedLocal),
-						),
+							this.processStructureValue(value as StructureValue, visitedLocal)
+						)
 					);
 				}
-			}),
+			})
 		);
 	}
 
 	private async processStructureValue(
 		structureValue: StructureValue,
-		visited: Set<string>,
+		visited: Set<string>
 	): Promise<void> {
 		if (!structureValue || !isObject(structureValue)) {
 			return;
@@ -252,7 +252,7 @@ class ConfigurationLoader {
 				'_inputs_from_glob',
 				'_inputs',
 				false,
-				visited,
+				visited
 			);
 		}
 
@@ -270,7 +270,7 @@ class ConfigurationLoader {
 		globKey: GlobTypeKey,
 		targetKey: string,
 		isArray: boolean,
-		visited?: Set<string>,
+		visited?: Set<string>
 	): Promise<void> {
 		const globs = config[globKey];
 
@@ -286,18 +286,18 @@ class ConfigurationLoader {
 		const loadedDataWithSources = await this.loadFilesFromGlobs(
 			globs as string[],
 			globKey,
-			visited,
+			visited
 		);
 
 		if (isArray) {
 			config[targetKey] = this.mergeArrayValues(
 				(config[targetKey] || []) as unknown[],
-				loadedDataWithSources,
+				loadedDataWithSources
 			);
 		} else {
 			config[targetKey] = this.mergeObjectValues(
 				(config[targetKey] || {}) as Record<string, unknown>,
-				loadedDataWithSources,
+				loadedDataWithSources
 			);
 		}
 
@@ -311,7 +311,7 @@ class ConfigurationLoader {
 	private async loadFilesFromGlobs(
 		globs: string[],
 		globKey: GlobTypeKey,
-		visited?: Set<string>,
+		visited?: Set<string>
 	): Promise<Array<{ data: unknown; source: string }>> {
 		const matchingFiles = this.findFilesMatchingGlobs(globs);
 		// Sort by path to ensure consistent ordering
@@ -372,7 +372,7 @@ class ConfigurationLoader {
 	 */
 	private mergeObjectValues(
 		base: Record<string, unknown>,
-		loaded: Array<{ data: unknown; source: string }>,
+		loaded: Array<{ data: unknown; source: string }>
 	): Record<string, unknown> {
 		const result = { ...base };
 
@@ -406,7 +406,7 @@ class ConfigurationLoader {
 	 */
 	private mergeArrayValues(
 		base: unknown[],
-		loaded: Array<{ data: unknown; source: string }>,
+		loaded: Array<{ data: unknown; source: string }>
 	): unknown[] {
 		const result = [...base];
 
@@ -452,7 +452,7 @@ function removeDuplicateWarnings(warnings: GlobLoaderWarnings): GlobLoaderWarnin
 	for (const warning of warnings.cycles) {
 		if (
 			!result.cycles.some(
-				(w) => w.path === warning.path && w.chain.join(' → ') === warning.chain.join(' → '),
+				(w) => w.path === warning.path && w.chain.join(' → ') === warning.chain.join(' → ')
 			)
 		) {
 			result.cycles.push(warning);
@@ -462,7 +462,7 @@ function removeDuplicateWarnings(warnings: GlobLoaderWarnings): GlobLoaderWarnin
 	for (const warning of warnings.multipleGlobKeys) {
 		if (
 			!result.multipleGlobKeys.some(
-				(w) => w.path === warning.path && w.type1 === warning.type1 && w.type2 === warning.type2,
+				(w) => w.path === warning.path && w.type1 === warning.type1 && w.type2 === warning.type2
 			)
 		) {
 			result.multipleGlobKeys.push(warning);
@@ -508,11 +508,11 @@ function removeDuplicateWarnings(warnings: GlobLoaderWarnings): GlobLoaderWarnin
  */
 export async function mergeConfiguration(
 	config: Configuration,
-	options: MergeConfigurationOptions,
+	options: MergeConfigurationOptions
 ): Promise<GlobResult> {
 	const loader = new ConfigurationLoader(options.findFilesMatchingGlobs, options.loadConfigFile);
 	const result = await loader.mergeConfiguration(
-		JSON.parse(JSON.stringify(config)) as Configuration,
+		JSON.parse(JSON.stringify(config)) as Configuration
 	);
 
 	return {
