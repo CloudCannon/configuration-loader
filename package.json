@@ -47,7 +47,7 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/CloudCannon/configuration-loader.git"
+		"url": "git+https://github.com/CloudCannon/configuration-loader.git"
 	},
 	"homepage": "https://cloudcannon.com/documentation/articles/why-split-your-configuration-file/",
 	"dependencies": {
