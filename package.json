@@ -25,6 +25,9 @@
 		"src",
 		"dist"
 	],
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"typecheck": "tsc --noEmit",
 		"build:types": "tsc --emitDeclarationOnly",
