@@ -57,7 +57,7 @@
 		"@cloudcannon/configuration-types": "0.0.56"
 	},
 	"peerDependencies": {
-		"js-yaml": "4.0.0"
+		"js-yaml": "^4.0.0"
 	},
 	"peerDependenciesMeta": {
 		"js-yaml": {
