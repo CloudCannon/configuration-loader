@@ -10,33 +10,31 @@
 		".": {
 			"import": {
 				"types": "./dist/index.d.ts",
-				"default": "./src/index.ts"
+				"default": "./dist/index.js"
 			}
 		},
 		"./browser": {
 			"import": {
 				"types": "./dist/browser.d.ts",
-				"default": "./src/browser.ts"
+				"default": "./dist/browser.js"
 			}
 		}
 	},
+	"main": "dist/index.js",
 	"types": "./dist/index.d.ts",
 	"files": [
-		"src",
 		"dist"
 	],
 	"publishConfig": {
 		"access": "public"
 	},
 	"scripts": {
-		"typecheck": "tsc --noEmit",
-		"build:types": "tsc --emitDeclarationOnly",
-		"build": "npm run build:types",
+		"build": "tsc",
 		"test": "node --experimental-strip-types --test src/**/*.test.ts",
 		"test:watch": "node --experimental-strip-types --watch --test",
 		"test:coverage": "node --experimental-strip-types --experimental-test-coverage --test src/**/*.test.ts",
-		"lint": "biome check src/",
-		"lint:fix": "biome check --write src/",
+		"lint": "biome check src/ && tsc --noEmit",
+		"lint:fix": "biome check --fix src/",
 		"format": "biome format --write src/",
 		"prepublishOnly": "npm run build"
 	},
