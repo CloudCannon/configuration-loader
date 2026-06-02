@@ -83,6 +83,7 @@ class ConfigurationLoader {
 			false
 		);
 		await this.importFromGlobKey(config, '_inputs_from_glob', '_inputs', false);
+		await this.importFromGlobKey(config, '_editables_from_glob', '_editables', false);
 		await this.importFromGlobKey(config, '_structures_from_glob', '_structures', false);
 
 		await this.processInputsKey(config._inputs);
@@ -98,34 +99,40 @@ class ConfigurationLoader {
 						await this.importFromGlobKey(collectionConfig, 'schemas_from_glob', 'schemas', false);
 					}
 
-					const collection = (config.collections_config as Record<string, unknown>)[collectionKey];
-					await this.importFromGlobKey(
-						collection as Record<string, unknown>,
-						'_inputs_from_glob',
-						'_inputs',
-						false
-					);
-					await this.importFromGlobKey(
-						collection as Record<string, unknown>,
-						'_structures_from_glob',
-						'_structures',
-						false
-					);
+					const collection = config.collections_config[collectionKey] as Record<string, unknown>;
+					await this.importFromGlobKey(collection, '_inputs_from_glob', '_inputs', false);
+					await this.importFromGlobKey(collection, '_editables_from_glob', '_editables', false);
+					await this.importFromGlobKey(collection, '_structures_from_glob', '_structures', false);
 
-					await this.processInputsKey(
-						(collection as Record<string, unknown>)._inputs as Configuration['_inputs']
-					);
-					await this.processStructuresKey(
-						(collection as Record<string, unknown>)._structures as Configuration['_structures']
-					);
+					await this.processInputsKey(collection._inputs as Configuration['_inputs']);
+					await this.processStructuresKey(collection._structures as Configuration['_structures']);
+
+					if (isObject(collection.create)) {
+						await this.importFromGlobKey(collection.create, '_inputs_from_glob', '_inputs', false);
+						await this.importFromGlobKey(
+							collection.create,
+							'_structures_from_glob',
+							'_structures',
+							false
+						);
+
+						await this.processInputsKey(collection.create._inputs as Configuration['_inputs']);
+						await this.processStructuresKey(
+							collection.create._structures as Configuration['_structures']
+						);
+					}
 
 					// Process recursive globs in schemas
-					if (isObject((collection as Record<string, unknown>).schemas)) {
-						for (const schemaValue of Object.values(
-							(collection as Record<string, unknown>).schemas as Record<string, unknown>
-						)) {
+					if (isObject(collection.schemas)) {
+						for (const schemaValue of Object.values(collection.schemas)) {
 							if (isObject(schemaValue)) {
 								await this.importFromGlobKey(schemaValue, '_inputs_from_glob', '_inputs', false);
+								await this.importFromGlobKey(
+									schemaValue,
+									'_editables_from_glob',
+									'_editables',
+									false
+								);
 								await this.importFromGlobKey(
 									schemaValue,
 									'_structures_from_glob',
@@ -137,6 +144,28 @@ class ConfigurationLoader {
 								await this.processStructuresKey(
 									schemaValue._structures as Configuration['_structures']
 								);
+
+								if (isObject(schemaValue.create)) {
+									await this.importFromGlobKey(
+										schemaValue.create,
+										'_inputs_from_glob',
+										'_inputs',
+										false
+									);
+									await this.importFromGlobKey(
+										schemaValue.create,
+										'_structures_from_glob',
+										'_structures',
+										false
+									);
+
+									await this.processInputsKey(
+										schemaValue.create._inputs as Configuration['_inputs']
+									);
+									await this.processStructuresKey(
+										schemaValue.create._structures as Configuration['_structures']
+									);
+								}
 							}
 						}
 					}
@@ -229,9 +258,7 @@ class ConfigurationLoader {
 
 				if (structure.values && Array.isArray(structure.values)) {
 					await Promise.all(
-						structure.values.map(async (value) =>
-							this.processStructureValue(value as StructureValue, visitedLocal)
-						)
+						structure.values.map(async (value) => this.processStructureValue(value, visitedLocal))
 					);
 				}
 			})
@@ -246,7 +273,7 @@ class ConfigurationLoader {
 			return;
 		}
 
-		if ((structureValue as Record<string, unknown>)._inputs_from_glob) {
+		if (structureValue._inputs_from_glob) {
 			await this.importFromGlobKey(
 				structureValue as Record<string, unknown>,
 				'_inputs_from_glob',

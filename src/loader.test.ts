@@ -134,7 +134,7 @@ describe('mergeConfiguration', () => {
 			_inputs_from_glob: ['/.cloudcannon/*.yml'],
 		};
 
-		const mockFiles = {
+		const mockFiles: Record<string, unknown> = {
 			'/.cloudcannon/config.yml': { test: { type: 'text' } },
 		};
 
@@ -211,6 +211,115 @@ describe('mergeConfiguration', () => {
 		assert.equal(JSON.stringify(config), originalConfigString);
 	});
 
+	it('merges editables from glob patterns', async () => {
+		const config: Configuration = {
+			_editables_from_glob: ['/.cloudcannon/editables/*.yml'],
+		};
+
+		const mockFiles: Record<string, unknown> = {
+			'/.cloudcannon/editables/content.yml': {
+				content: { bold: true, italic: true },
+			},
+		};
+
+		const result = await mergeConfiguration(config, {
+			findFilesMatchingGlobs: () => Object.keys(mockFiles),
+			loadConfigFile: async (path: string) => mockFiles[path],
+		});
+
+		assert.ok(result.config._editables);
+		assert.ok('content' in result.config._editables);
+	});
+
+	it('processes _editables_from_glob inside a collection', async () => {
+		const config: Configuration = {
+			collections_config: {
+				posts: {
+					path: 'content/posts',
+					_editables_from_glob: ['/.cloudcannon/editables/*.yml'],
+				},
+			},
+		};
+
+		const mockFiles: Record<string, unknown> = {
+			'/.cloudcannon/editables/content.yml': {
+				content: { bold: true },
+			},
+		};
+
+		const result = await mergeConfiguration(config, {
+			findFilesMatchingGlobs: () => Object.keys(mockFiles),
+			loadConfigFile: async (path: string) => mockFiles[path],
+		});
+
+		const posts = result.config.collections_config?.posts;
+		assert.ok(posts?._editables);
+		assert.ok('content' in posts._editables);
+	});
+
+	it('processes _inputs_from_glob inside a collection create', async () => {
+		const config: Configuration = {
+			collections_config: {
+				posts: {
+					path: 'content/posts',
+					create: {
+						path: '[collections_config.posts.path]/[slug].[ext]',
+						_inputs_from_glob: ['/.cloudcannon/inputs/*.yml'],
+					},
+				},
+			},
+		};
+
+		const mockFiles: Record<string, unknown> = {
+			'/.cloudcannon/inputs/title.yml': {
+				title: { type: 'text' },
+			},
+		};
+
+		const result = await mergeConfiguration(config, {
+			findFilesMatchingGlobs: () => Object.keys(mockFiles),
+			loadConfigFile: async (path: string) => mockFiles[path],
+		});
+
+		const create = result.config.collections_config?.posts?.create;
+		assert.ok(create?._inputs);
+		assert.ok('title' in create._inputs);
+	});
+
+	it('processes _inputs_from_glob inside a schema create', async () => {
+		const config: Configuration = {
+			collections_config: {
+				posts: {
+					path: 'content/posts',
+					schemas: {
+						default: {
+							path: 'schemas/default.md',
+							create: {
+								path: '[collections_config.posts.path]/[slug].[ext]',
+								_inputs_from_glob: ['/.cloudcannon/inputs/*.yml'],
+							},
+						},
+					},
+				},
+			},
+		};
+
+		const mockFiles: Record<string, unknown> = {
+			'/.cloudcannon/inputs/title.yml': {
+				title: { type: 'text' },
+			},
+		};
+
+		const result = await mergeConfiguration(config, {
+			findFilesMatchingGlobs: () => Object.keys(mockFiles),
+			loadConfigFile: async (path: string) => mockFiles[path],
+		});
+
+		const create = result.config.collections_config?.posts?.schemas?.default?.create;
+		assert.ok(create?._inputs);
+		assert.ok('title' in create._inputs);
+	});
+
 	it('processes nested schemas_from_glob in collections', async () => {
 		const config: Configuration = {
 			collections_config: {
@@ -232,9 +341,9 @@ describe('mergeConfiguration', () => {
 			loadConfigFile: async (path: string) => mockFiles[path],
 		});
 
-		const postsConfig = result.config.collections_config?.posts as Record<string, unknown>;
+		const postsConfig = result.config.collections_config?.posts;
 		assert.ok(postsConfig?.schemas);
-		assert.ok((postsConfig.schemas as Record<string, unknown>).default);
+		assert.ok(postsConfig.schemas.default);
 	});
 
 	it('handles file load errors gracefully', async () => {
@@ -409,7 +518,7 @@ describe('warnings', () => {
 				_inputs_from_glob: ['/.cloudcannon/shared/*.yml'],
 			};
 
-			const mockFiles = {
+			const mockFiles: Record<string, unknown> = {
 				'/.cloudcannon/shared/config.yml': { test: { type: 'text' } },
 			};
 
@@ -429,7 +538,7 @@ describe('warnings', () => {
 				_inputs_from_glob: ['/.cloudcannon/inputs/*.yml', '/.cloudcannon/inputs/seo.yml'],
 			};
 
-			const mockFiles = {
+			const mockFiles: Record<string, unknown> = {
 				'/.cloudcannon/inputs/seo.yml': { title: { type: 'text' } },
 			};
 
@@ -447,7 +556,7 @@ describe('warnings', () => {
 				_inputs_from_glob: ['/.cloudcannon/shared/*.yml'],
 			};
 
-			const mockFiles = {
+			const mockFiles: Record<string, unknown> = {
 				'/.cloudcannon/shared/config.yml': { posts: { path: 'content/posts' } },
 			};
 
