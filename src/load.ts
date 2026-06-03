@@ -1,6 +1,6 @@
 import { globSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import type { Configuration } from '@cloudcannon/configuration-types';
 import { mergeConfiguration } from './loader.ts';
 import type { GlobResult, MergeConfigurationOptions } from './types.ts';
@@ -106,11 +106,20 @@ export async function loadConfiguration(
 		// Glob operations are typically fast (just directory traversal), while file
 		// reading (handled by loadConfigFile) is the slower I/O operation.
 		findFilesMatchingGlobs: (globs: string[]) => {
-			const resolvedGlobs = globs.map((g) => {
+			const resolvedGlobs = globs.flatMap((g) => {
 				if (g.startsWith('!')) {
-					return `!${resolve(configDir, g.slice(1))}`;
+					const pattern = g.slice(1);
+					const resolved = resolve(configDir, pattern.startsWith('/') ? pattern.slice(1) : pattern);
+					if (relative(configDir, resolved).startsWith('..')) {
+						return [];
+					}
+					return [`!${resolved}`];
 				}
-				return resolve(configDir, g);
+				const resolved = resolve(configDir, g.startsWith('/') ? g.slice(1) : g);
+				if (relative(configDir, resolved).startsWith('..')) {
+					return [];
+				}
+				return [resolved];
 			});
 			return globSync(resolvedGlobs) as string[];
 		},
