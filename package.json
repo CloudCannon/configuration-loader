@@ -52,7 +52,7 @@
 	},
 	"homepage": "https://cloudcannon.com/documentation/articles/why-split-your-configuration-file/",
 	"dependencies": {
-		"@cloudcannon/configuration-types": "0.0.60"
+		"@cloudcannon/configuration-types": "0.0.61"
 	},
 	"peerDependencies": {
 		"js-yaml": "^4.0.0"
@@ -63,8 +63,8 @@
 		}
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.5.10",
-		"@types/node": "26.3.0",
+		"@biomejs/biome": "2.5.11",
+		"@types/node": "26.4.0",
 		"typescript": "7.0.2"
 	}
 }
