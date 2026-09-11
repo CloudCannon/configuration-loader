@@ -176,26 +176,46 @@ class ConfigurationLoader {
 		// Process recursive globs in _snippets (can have _inputs_from_glob)
 		if (config._snippets && isObject(config._snippets)) {
 			await this.importFromGlobKey(config._snippets, '_inputs_from_glob', '_inputs', false);
+			await this.processSnippetsKey(config._snippets);
+		}
 
-			for (const snippetConfig of Object.values(config._snippets)) {
-				if (isObject(snippetConfig)) {
-					await this.importFromGlobKey(snippetConfig, '_inputs_from_glob', '_inputs', false);
-					await this.importFromGlobKey(
-						snippetConfig,
-						'_structures_from_glob',
-						'_structures',
-						false
-					);
+		// Snippet templates are spread into snippets at runtime, so they share the snippet shape
+		if (config._snippets_templates && isObject(config._snippets_templates)) {
+			await this.processSnippetsKey(config._snippets_templates);
+		}
 
-					await this.processInputsKey(snippetConfig._inputs as Configuration['_inputs']);
-					await this.processStructuresKey(
-						snippetConfig._structures as Configuration['_structures']
-					);
+		// Process nested globs in file_config entries
+		// Entries can have: _inputs_from_glob, _editables_from_glob, _structures_from_glob
+		if (Array.isArray(config.file_config)) {
+			for (const entry of config.file_config) {
+				if (isObject(entry)) {
+					await this.importFromGlobKey(entry, '_inputs_from_glob', '_inputs', false);
+					await this.importFromGlobKey(entry, '_editables_from_glob', '_editables', false);
+					await this.importFromGlobKey(entry, '_structures_from_glob', '_structures', false);
+
+					await this.processInputsKey(entry._inputs as Configuration['_inputs']);
+					await this.processStructuresKey(entry._structures as Configuration['_structures']);
 				}
 			}
 		}
 
 		return config;
+	}
+
+	/*
+	 * Process recursive globs in each snippet (or snippet template) entry.
+	 * Snippets can have: _inputs_from_glob, _structures_from_glob
+	 */
+	private async processSnippetsKey(snippets: Record<string, unknown>): Promise<void> {
+		for (const snippetConfig of Object.values(snippets)) {
+			if (isObject(snippetConfig)) {
+				await this.importFromGlobKey(snippetConfig, '_inputs_from_glob', '_inputs', false);
+				await this.importFromGlobKey(snippetConfig, '_structures_from_glob', '_structures', false);
+
+				await this.processInputsKey(snippetConfig._inputs as Configuration['_inputs']);
+				await this.processStructuresKey(snippetConfig._structures as Configuration['_structures']);
+			}
+		}
 	}
 
 	/*
@@ -210,32 +230,44 @@ class ConfigurationLoader {
 		if (inputs && isObject(inputs)) {
 			for (const inputValue of Object.values(inputs)) {
 				if (isObject(inputValue) && isObject((inputValue as Record<string, unknown>).options)) {
-					const structures = (
-						(inputValue as Record<string, unknown>).options as Record<string, unknown>
-					)?.structures;
+					const options = (inputValue as Record<string, unknown>).options as Record<
+						string,
+						unknown
+					>;
 					const visitedLocal = visited || new Set<string>();
 
-					if (structures && isObject(structures)) {
-						if (structures.values_from_glob) {
-							await this.importFromGlobKey(
-								structures,
-								'values_from_glob',
-								'values',
-								true,
-								visitedLocal
-							);
-						}
+					// Array and object inputs: options.structures
+					await this.processInputStructures(options.structures, visitedLocal);
 
-						if (Array.isArray(structures.values)) {
-							await Promise.all(
-								structures.values.map(async (value: StructureValue) =>
-									this.processStructureValue(value, visitedLocal)
-								)
-							);
-						}
-					}
+					// Mutable object inputs: options.entries.structures
+					await this.processInputStructures(
+						(options.entries as Record<string, unknown> | undefined)?.structures,
+						visitedLocal
+					);
 				}
 			}
+		}
+	}
+
+	/*
+	 * Process an inline structure on an input (options.structures or options.entries.structures).
+	 * Structure references (strings) are skipped as they point at _structures, which is processed separately.
+	 */
+	private async processInputStructures(structures: unknown, visited: Set<string>): Promise<void> {
+		if (!structures || !isObject(structures)) {
+			return;
+		}
+
+		if (structures.values_from_glob) {
+			await this.importFromGlobKey(structures, 'values_from_glob', 'values', true, visited);
+		}
+
+		if (Array.isArray(structures.values)) {
+			await Promise.all(
+				structures.values.map(async (value: StructureValue) =>
+					this.processStructureValue(value, visited)
+				)
+			);
 		}
 	}
 
@@ -285,6 +317,21 @@ class ConfigurationLoader {
 
 		if (structureValue._inputs) {
 			await this.processInputsKey(structureValue._inputs, visited);
+		}
+
+		// Structure values can scope their own _structures for the inputs they contain
+		if (structureValue._structures_from_glob) {
+			await this.importFromGlobKey(
+				structureValue as Record<string, unknown>,
+				'_structures_from_glob',
+				'_structures',
+				false,
+				visited
+			);
+		}
+
+		if (structureValue._structures) {
+			await this.processStructuresKey(structureValue._structures, visited);
 		}
 	}
 

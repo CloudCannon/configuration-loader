@@ -257,6 +257,150 @@ describe('mergeConfiguration', () => {
 		assert.ok('content' in posts._editables);
 	});
 
+	it('processes *_from_glob keys inside file_config entries', async () => {
+		const config: Configuration = {
+			file_config: [
+				{
+					glob: 'content/**/*.md',
+					_inputs_from_glob: ['/.cloudcannon/inputs/*.yml'],
+					_editables_from_glob: ['/.cloudcannon/editables/*.yml'],
+					_structures_from_glob: ['/.cloudcannon/structures/*.yml'],
+				},
+			],
+		};
+
+		const mockFiles: Record<string, unknown> = {
+			'/.cloudcannon/inputs/title.yml': {
+				title: { type: 'text' },
+			},
+			'/.cloudcannon/editables/content.yml': {
+				content: { bold: true },
+			},
+			'/.cloudcannon/structures/blocks.yml': {
+				blocks: { values_from_glob: ['/.cloudcannon/structures/blocks/*.yml'] },
+			},
+			'/.cloudcannon/structures/blocks/hero.yml': {
+				label: 'Hero',
+				value: { _type: 'hero' },
+			},
+		};
+
+		const result = await mergeConfiguration(config, {
+			findFilesMatchingGlobs: (patterns: string[]) =>
+				Object.keys(mockFiles).filter((path) =>
+					patterns.some((pattern) => {
+						const prefix = pattern.replace(/\*\.yml$/, '');
+						return path.startsWith(prefix) && !path.slice(prefix.length).includes('/');
+					})
+				),
+			loadConfigFile: async (path: string) => mockFiles[path],
+		});
+
+		const entry = result.config.file_config?.[0];
+		assert.ok(entry?._inputs);
+		assert.ok('title' in entry._inputs);
+		assert.ok(entry._editables);
+		assert.ok('content' in entry._editables);
+		assert.ok(entry._structures);
+		assert.equal(entry._structures.blocks?.values?.length, 1);
+		assert.equal(entry._structures.blocks?.values?.[0]?.label, 'Hero');
+		assert.ok(
+			result.globKeyToPaths.values_from_glob.has('/.cloudcannon/structures/blocks/hero.yml')
+		);
+	});
+
+	it('processes _structures_from_glob inside a structure value', async () => {
+		const config: Configuration = {
+			_structures: {
+				blocks: {
+					values: [
+						{
+							label: 'Hero',
+							value: { _type: 'hero', buttons: [] },
+							_structures_from_glob: ['/.cloudcannon/structures/hero/*.yml'],
+						},
+					],
+				},
+			},
+		};
+
+		const mockFiles: Record<string, unknown> = {
+			'/.cloudcannon/structures/hero/buttons.yml': {
+				buttons: { values_from_glob: ['/.cloudcannon/structures/hero/buttons/*.yml'] },
+			},
+			'/.cloudcannon/structures/hero/buttons/primary.yml': {
+				label: 'Primary',
+				value: { style: 'primary' },
+			},
+		};
+
+		const result = await mergeConfiguration(config, {
+			findFilesMatchingGlobs: (patterns: string[]) =>
+				Object.keys(mockFiles).filter((path) =>
+					patterns.some((pattern) => {
+						const prefix = pattern.replace(/\*\.yml$/, '');
+						return path.startsWith(prefix) && !path.slice(prefix.length).includes('/');
+					})
+				),
+			loadConfigFile: async (path: string) => mockFiles[path],
+		});
+
+		const hero = result.config._structures?.blocks?.values?.[0];
+		assert.ok(hero);
+		assert.equal('_structures_from_glob' in hero, false);
+		assert.ok(hero._structures);
+		assert.equal(hero._structures.buttons?.values?.length, 1);
+		assert.equal(hero._structures.buttons?.values?.[0]?.label, 'Primary');
+		assert.ok(
+			result.globKeyToPaths.values_from_glob.has(
+				'/.cloudcannon/structures/hero/buttons/primary.yml'
+			)
+		);
+	});
+
+	it('processes *_from_glob keys inside _snippets_templates entries', async () => {
+		const config: Configuration = {
+			_snippets_templates: {
+				base: {
+					template: 'hugo_shortcode',
+					_inputs_from_glob: ['/.cloudcannon/inputs/*.yml'],
+					_structures_from_glob: ['/.cloudcannon/structures/*.yml'],
+				},
+			},
+		};
+
+		const mockFiles: Record<string, unknown> = {
+			'/.cloudcannon/inputs/title.yml': {
+				title: { type: 'text' },
+			},
+			'/.cloudcannon/structures/blocks.yml': {
+				blocks: { values_from_glob: ['/.cloudcannon/structures/blocks/*.yml'] },
+			},
+			'/.cloudcannon/structures/blocks/hero.yml': {
+				label: 'Hero',
+				value: { _type: 'hero' },
+			},
+		};
+
+		const result = await mergeConfiguration(config, {
+			findFilesMatchingGlobs: (patterns: string[]) =>
+				Object.keys(mockFiles).filter((path) =>
+					patterns.some((pattern) => {
+						const prefix = pattern.replace(/\*\.yml$/, '');
+						return path.startsWith(prefix) && !path.slice(prefix.length).includes('/');
+					})
+				),
+			loadConfigFile: async (path: string) => mockFiles[path],
+		});
+
+		const template = result.config._snippets_templates?.base;
+		assert.ok(template?._inputs);
+		assert.ok('title' in template._inputs);
+		assert.ok(template._structures);
+		assert.equal(template._structures.blocks?.values?.length, 1);
+		assert.equal(template._structures.blocks?.values?.[0]?.label, 'Hero');
+	});
+
 	it('processes _inputs_from_glob inside a collection create', async () => {
 		const config: Configuration = {
 			collections_config: {
@@ -344,6 +488,45 @@ describe('mergeConfiguration', () => {
 		const postsConfig = result.config.collections_config?.posts;
 		assert.ok(postsConfig?.schemas);
 		assert.ok(postsConfig.schemas.default);
+	});
+
+	it('processes values_from_glob in options.entries.structures for mutable objects', async () => {
+		const config: Configuration = {
+			_inputs: {
+				settings: {
+					type: 'object',
+					options: {
+						subtype: 'mutable',
+						entries: {
+							structures: {
+								values_from_glob: ['/.cloudcannon/structures/entries/*.yml'],
+							},
+						},
+					},
+				},
+			},
+		};
+
+		const mockFiles: Record<string, unknown> = {
+			'/.cloudcannon/structures/entries/text.yml': {
+				label: 'Text',
+				value: { _type: 'text' },
+			},
+		};
+
+		const result = await mergeConfiguration(config, {
+			findFilesMatchingGlobs: () => Object.keys(mockFiles),
+			loadConfigFile: async (path: string) => mockFiles[path],
+		});
+
+		const settings = result.config._inputs?.settings as Record<string, unknown>;
+		const options = settings.options as Record<string, unknown>;
+		const entries = options.entries as Record<string, unknown>;
+		const structures = entries.structures as Record<string, unknown>;
+		assert.equal((structures.values as unknown[]).length, 1);
+		assert.ok(
+			result.globKeyToPaths.values_from_glob.has('/.cloudcannon/structures/entries/text.yml')
+		);
 	});
 
 	it('handles file load errors gracefully', async () => {
