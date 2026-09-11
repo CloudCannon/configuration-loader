@@ -11,23 +11,23 @@ import type { GlobResult, MergeConfigurationOptions } from './types.ts';
 export interface LoadConfigurationOptions {
 	/**
 	 * Custom function to parse file contents. Can be sync or async.
-	 * Defaults to JSON.parse for .json files, and js-yaml for .yml/.yaml files.
+	 * Defaults to JSON.parse for .json files, and the 'yaml' package for .yml/.yaml files.
 	 * If not provided and a YAML file is encountered, an error will be thrown
-	 * suggesting to install the 'js-yaml' package.
+	 * suggesting to install the 'yaml' package.
 	 */
 	parseFile?: (contents: string, filePath: string) => unknown | Promise<unknown>;
 }
 
 /**
- * Attempts to load the js-yaml package dynamically.
- * Returns the load function if available, otherwise returns undefined.
+ * Attempts to load the yaml package dynamically.
+ * Returns the parse function if available, otherwise returns undefined.
  */
 async function tryLoadYamlParser(): Promise<((content: string) => unknown) | undefined> {
 	try {
 		// Use a variable to prevent TypeScript from trying to resolve the module statically
-		const jsYamlModuleName = 'js-yaml';
-		const jsYaml = (await import(jsYamlModuleName)) as { load: (s: string) => unknown };
-		return jsYaml.load;
+		const yamlModuleName = 'yaml';
+		const yaml = (await import(yamlModuleName)) as { parse: (s: string) => unknown };
+		return yaml.parse;
 	} catch {
 		return undefined;
 	}
@@ -46,9 +46,7 @@ async function createDefaultParser(): Promise<(contents: string, filePath: strin
 
 		if (filePath.endsWith('.yml') || filePath.endsWith('.yaml')) {
 			if (!yamlParse) {
-				throw new Error(
-					`Cannot parse YAML file "${filePath}". Install js-yaml: npm install js-yaml`
-				);
+				throw new Error(`Cannot parse YAML file "${filePath}". Install yaml: npm install yaml`);
 			}
 			return yamlParse(contents);
 		}
@@ -61,7 +59,7 @@ async function createDefaultParser(): Promise<(contents: string, filePath: strin
 				return yamlParse(contents);
 			}
 			throw new Error(
-				`Cannot parse file "${filePath}". Install js-yaml for YAML support: npm install js-yaml`
+				`Cannot parse file "${filePath}". Install yaml for YAML support: npm install yaml`
 			);
 		}
 	};
