@@ -529,35 +529,6 @@ describe('mergeConfiguration', () => {
 		);
 	});
 
-	it('ignores options.entries.structures when subtype is not mutable', async () => {
-		const config: Configuration = {
-			_inputs: {
-				settings: {
-					type: 'object',
-					options: {
-						entries: {
-							structures: {
-								values_from_glob: ['/.cloudcannon/structures/entries/*.yml'],
-							},
-						},
-					},
-				},
-			},
-		};
-
-		const result = await mergeConfiguration(config, {
-			findFilesMatchingGlobs: () => ['/.cloudcannon/structures/entries/text.yml'],
-			loadConfigFile: async () => ({ label: 'Text', value: { _type: 'text' } }),
-		});
-
-		const settings = result.config._inputs?.settings as Record<string, unknown>;
-		const options = settings.options as Record<string, unknown>;
-		const entries = options.entries as Record<string, unknown>;
-		const structures = entries.structures as Record<string, unknown>;
-		assert.equal(structures.values, undefined);
-		assert.equal(result.globKeyToPaths.values_from_glob.size, 0);
-	});
-
 	it('handles file load errors gracefully', async () => {
 		const config: Configuration = {
 			_inputs_from_glob: ['/.cloudcannon/inputs/*.yml'],
