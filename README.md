@@ -37,10 +37,10 @@ That's it! The `loadConfiguration` function handles:
 
 ### YAML Support
 
-For YAML files, install `js-yaml`:
+For YAML files, install `yaml`:
 
 ```bash
-npm install js-yaml
+npm install yaml
 ```
 
 The loader will automatically detect and use it.
@@ -49,7 +49,7 @@ The loader will automatically detect and use it.
 
 We don't bundle a YAML parser because:
 
-1. **You likely already have one** — most projects using CloudCannon configuration already have `js-yaml` or similar installed for their build tooling
+1. **You likely already have one** — most projects using CloudCannon configuration already have `yaml` or similar installed for their build tooling
 2. **Keeps the package lightweight** — no unnecessary dependencies if you only use JSON configs
 3. **Flexibility** — you can use any YAML parser via the `parseFile` option if you prefer a different one
 
