@@ -53,7 +53,7 @@
 	},
 	"homepage": "https://cloudcannon.com/documentation/articles/why-split-your-configuration-file/",
 	"dependencies": {
-		"@cloudcannon/configuration-types": "0.0.68"
+		"@cloudcannon/configuration-types": "0.0.69"
 	},
 	"peerDependencies": {
 		"yaml": "^2.0.0"
