@@ -1,9 +1,161 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Configuration } from '@cloudcannon/configuration-types';
-import { mergeConfiguration } from './loader.ts';
+import { ConfigurationLoadError, InvalidGlobPatternError } from '../src/errors.ts';
+import { mergeConfiguration } from '../src/loader.ts';
 
 describe('mergeConfiguration', () => {
+	it('throws a ConfigurationLoadError when the config is not an object', async () => {
+		const options = {
+			findFilesMatchingGlobs: () => [],
+			loadConfigFile: async () => ({}),
+		};
+
+		await assert.rejects(
+			mergeConfiguration(null as unknown as Configuration, options),
+			(error: unknown) => {
+				assert.ok(error instanceof ConfigurationLoadError);
+				assert.match(error.message, /expected a top-level object but received null/);
+				return true;
+			}
+		);
+
+		await assert.rejects(
+			mergeConfiguration([] as unknown as Configuration, options),
+			(error: unknown) => {
+				assert.ok(error instanceof ConfigurationLoadError);
+				assert.match(error.message, /expected a top-level object but received an array/);
+				return true;
+			}
+		);
+	});
+
+	it('captures the config path in invalid glob pattern errors', async () => {
+		const config = { _inputs_from_glob: [123] } as unknown as Configuration;
+
+		await assert.rejects(
+			mergeConfiguration(config, {
+				configPath: '/site/cloudcannon.config.yml',
+				findFilesMatchingGlobs: () => [],
+				loadConfigFile: async () => ({}),
+			}),
+			(error: unknown) => {
+				assert.ok(error instanceof InvalidGlobPatternError);
+				assert.equal(error.filePath, '/site/cloudcannon.config.yml');
+				assert.equal(error.pattern, 123);
+				assert.equal(error.reason, 'expected a string');
+				return true;
+			}
+		);
+	});
+
+	it('throws a ConfigurationLoadError when a glob target has the wrong shape', async () => {
+		const cases = [
+			{
+				config: {
+					_structures: {
+						example: { values_from_glob: ['/.cloudcannon/structures/*.yml'], values: {} },
+					},
+				},
+				message: /expected "values" to be an array/,
+			},
+			{
+				config: {
+					_structures: {
+						example: { values_from_glob: ['/.cloudcannon/structures/*.yml'], values: 'abc' },
+					},
+				},
+				message: /expected "values" to be an array/,
+			},
+			{
+				config: {
+					collections_config_from_glob: ['/.cloudcannon/collections/*.yml'],
+					collections_config: 'abc',
+				},
+				message: /expected "collections_config" to be an object/,
+			},
+		];
+
+		for (const { config, message } of cases) {
+			await assert.rejects(
+				mergeConfiguration(config as unknown as Configuration, {
+					configPath: '/site/cloudcannon.config.yml',
+					findFilesMatchingGlobs: () => [],
+					loadConfigFile: async () => ({}),
+				}),
+				(error: unknown) => {
+					assert.ok(error instanceof ConfigurationLoadError);
+					assert.match(error.message, message);
+					assert.equal(error.filePath, '/site/cloudcannon.config.yml');
+					return true;
+				}
+			);
+		}
+	});
+
+	it('throws a ConfigurationLoadError when the config is not JSON-serializable', async () => {
+		const circular: Record<string, unknown> = {};
+		circular.self = circular;
+
+		await assert.rejects(
+			mergeConfiguration(circular as unknown as Configuration, {
+				configPath: '/site/cloudcannon.config.yml',
+				findFilesMatchingGlobs: () => [],
+				loadConfigFile: async () => ({}),
+			}),
+			(error: unknown) => {
+				assert.ok(error instanceof ConfigurationLoadError);
+				assert.equal(error.filePath, '/site/cloudcannon.config.yml');
+				assert.match(error.message, /not JSON-serializable/);
+				assert.ok(error.cause instanceof TypeError);
+				return true;
+			}
+		);
+	});
+
+	it('does not wrap unexpected merge errors', async () => {
+		const unexpectedError = new Error('boom');
+
+		await assert.rejects(
+			mergeConfiguration(
+				{ collections_config_from_glob: ['/.cloudcannon/collections/*.yml'] },
+				{
+					findFilesMatchingGlobs: () => {
+						throw unexpectedError;
+					},
+					loadConfigFile: async () => ({}),
+				}
+			),
+			(error: unknown) => {
+				assert.equal(error, unexpectedError);
+				return true;
+			}
+		);
+	});
+
+	it('defines merged keys as own properties so __proto__ cannot pollute the result', async () => {
+		const config: Configuration = {
+			collections_config_from_glob: ['/.cloudcannon/collections/*.yml'],
+		};
+		const fileData = JSON.parse('{"__proto__":{"polluted":true}}');
+
+		const result = await mergeConfiguration(config, {
+			findFilesMatchingGlobs: () => ['/.cloudcannon/collections/evil.yml'],
+			loadConfigFile: async () => fileData,
+		});
+
+		const collections = result.config.collections_config as Record<string, unknown>;
+		assert.equal(Object.getPrototypeOf(collections), Object.prototype);
+		assert.equal(collections.polluted, undefined);
+		assert.deepEqual(Object.keys(collections), ['__proto__']);
+		const descriptor = Object.getOwnPropertyDescriptor(collections, '__proto__');
+		assert.equal(descriptor?.enumerable, true);
+		assert.deepEqual(descriptor?.value, {
+			polluted: true,
+			__source__: '/.cloudcannon/collections/evil.yml',
+		});
+	});
+
 	it('returns config unchanged when no glob keys present', async () => {
 		const config: Configuration = {
 			collections_config: {
@@ -22,6 +174,53 @@ describe('mergeConfiguration', () => {
 		assert.deepEqual(result.warnings.cycles, []);
 		assert.deepEqual(result.warnings.multipleGlobKeys, []);
 		assert.deepEqual(result.warnings.arrayValues, []);
+	});
+
+	it('supports an async findFilesMatchingGlobs', async () => {
+		const config: Configuration = {
+			collections_config_from_glob: ['/.cloudcannon/collections/*.yml'],
+		};
+
+		const mockFiles: Record<string, unknown> = {
+			'/.cloudcannon/collections/posts.yml': {
+				posts: { path: 'content/posts' },
+			},
+		};
+
+		const result = await mergeConfiguration(config, {
+			findFilesMatchingGlobs: async () => {
+				await Promise.resolve();
+				return Object.keys(mockFiles);
+			},
+			loadConfigFile: async (path: string) => mockFiles[path],
+		});
+
+		assert.equal(
+			(result.config.collections_config as Record<string, { path?: string }>).posts?.path,
+			'content/posts'
+		);
+	});
+
+	it('does not mutate the array returned by findFilesMatchingGlobs', async () => {
+		const config: Configuration = {
+			collections_config_from_glob: ['/.cloudcannon/collections/*.yml'],
+		};
+
+		const returnedFiles = ['/.cloudcannon/collections/z.yml', '/.cloudcannon/collections/a.yml'];
+		const mockFiles: Record<string, unknown> = {
+			'/.cloudcannon/collections/a.yml': { a: { path: 'content/a' } },
+			'/.cloudcannon/collections/z.yml': { z: { path: 'content/z' } },
+		};
+
+		await mergeConfiguration(config, {
+			findFilesMatchingGlobs: () => returnedFiles,
+			loadConfigFile: async (path: string) => mockFiles[path],
+		});
+
+		assert.deepEqual(returnedFiles, [
+			'/.cloudcannon/collections/z.yml',
+			'/.cloudcannon/collections/a.yml',
+		]);
 	});
 
 	it('merges collections from glob patterns', async () => {

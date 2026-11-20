@@ -17,12 +17,18 @@
 
 // Re-export useful types from configuration-types for convenience
 export type { Configuration, StructureValue } from '@cloudcannon/configuration-types';
-
+// Export the shared error type for configuration problems
+export {
+	ConfigurationError,
+	ConfigurationLoadError,
+	InvalidGlobPatternError,
+} from './errors.ts';
 // Export the core merge function (no Node.js dependencies)
 export { mergeConfiguration } from './loader.ts';
 
 // Export types from dedicated types file
 export type {
+	FindFilesMatchingGlobs,
 	GlobLoaderWarnings,
 	GlobResult,
 	GlobTypeKey,

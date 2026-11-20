@@ -30,12 +30,13 @@
 	},
 	"scripts": {
 		"build": "tsc",
-		"test": "node --experimental-strip-types --test src/**/*.test.ts",
-		"test:watch": "node --experimental-strip-types --watch --test",
-		"test:coverage": "node --experimental-strip-types --experimental-test-coverage --test src/**/*.test.ts",
-		"lint": "biome check src/ && tsc --noEmit",
-		"lint:fix": "biome check --fix src/",
-		"format": "biome format --write src/",
+		"test": "node --experimental-strip-types --test test/**/*.test.ts",
+		"test:watch": "node --experimental-strip-types --watch --test test/**/*.test.ts",
+		"test:coverage": "node --experimental-strip-types --experimental-test-coverage --test test/**/*.test.ts",
+		"lint": "biome check src/ test/ && tsc --noEmit",
+		"lint:fix": "biome check --fix src/ test/",
+		"format": "biome format --write src/ test/",
+		"typecheck": "tsc --noEmit",
 		"prepublishOnly": "npm run build"
 	},
 	"keywords": [
