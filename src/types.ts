@@ -84,15 +84,29 @@ export interface GlobResult {
 }
 
 /**
+ * Finds the files matching an array of glob patterns.
+ *
+ * Receives an array of glob patterns (including negation patterns starting with '!')
+ * and should return (or resolve to) an array of matching file paths. Implementations
+ * may be synchronous or asynchronous; the loader awaits the result before loading
+ * any matched files.
+ */
+export type FindFilesMatchingGlobs = (globs: string[]) => string[] | Promise<string[]>;
+
+/**
  * Options for the mergeConfiguration function.
  */
 export interface MergeConfigurationOptions {
 	/**
+	 * Path to the base configuration file, used for error reporting.
+	 */
+	configPath?: string;
+	/**
 	 * Function to find files matching glob patterns.
 	 * Receives an array of glob patterns (including negation patterns starting with '!')
-	 * and should return an array of matching file paths.
+	 * and should return (or resolve to) an array of matching file paths.
 	 */
-	findFilesMatchingGlobs: (globs: string[]) => string[];
+	findFilesMatchingGlobs: FindFilesMatchingGlobs;
 	/**
 	 * Function to load and parse a configuration file.
 	 * Should return the parsed content of the file (typically YAML or JSON).

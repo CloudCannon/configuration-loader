@@ -1,9 +1,10 @@
-import { globSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { dirname, relative, resolve } from 'node:path';
+import { glob, readFile } from 'node:fs/promises';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import type { Configuration } from '@cloudcannon/configuration-types';
+import { ConfigurationLoadError, invalidConfigurationError } from './errors.ts';
 import { mergeConfiguration } from './loader.ts';
 import type { GlobResult, MergeConfigurationOptions } from './types.ts';
+import { isObject } from './utils.ts';
 
 /**
  * Options for loadConfiguration.
@@ -95,31 +96,58 @@ export async function loadConfiguration(
 	const configDir = dirname(absoluteConfigPath);
 
 	// Load and parse the base configuration file
-	const configContents = await readFile(absoluteConfigPath, 'utf8');
-	const config = (await parseFile(configContents, absoluteConfigPath)) as Configuration;
+	let configContents: string;
+	try {
+		configContents = await readFile(absoluteConfigPath, 'utf8');
+	} catch (err) {
+		throw new ConfigurationLoadError(`Failed to read configuration file "${absoluteConfigPath}".`, {
+			cause: err,
+			filePath: absoluteConfigPath,
+		});
+	}
+
+	let config: unknown;
+	try {
+		config = await parseFile(configContents, absoluteConfigPath);
+	} catch (err) {
+		throw new ConfigurationLoadError(
+			`Failed to parse configuration file "${absoluteConfigPath}".`,
+			{ cause: err, filePath: absoluteConfigPath }
+		);
+	}
+
+	if (!isObject(config)) {
+		throw invalidConfigurationError(config, absoluteConfigPath);
+	}
 
 	// Create the merge options with default implementations
 	const mergeOptions: MergeConfigurationOptions = {
-		// Note: globSync is used here because the interface is synchronous by design.
-		// Glob operations are typically fast (just directory traversal), while file
-		// reading (handled by loadConfigFile) is the slower I/O operation.
-		findFilesMatchingGlobs: (globs: string[]) => {
-			const resolvedGlobs = globs.flatMap((g) => {
-				if (g.startsWith('!')) {
-					const pattern = g.slice(1);
-					const resolved = resolve(configDir, pattern.startsWith('/') ? pattern.slice(1) : pattern);
-					if (relative(configDir, resolved).startsWith('..')) {
-						return [];
-					}
-					return [`!${resolved}`];
+		configPath: absoluteConfigPath,
+
+		findFilesMatchingGlobs: async (globs: string[]) => {
+			const resolvedGlobs: string[] = [];
+
+			for (const globPattern of globs) {
+				const negated = globPattern.startsWith('!');
+				const pattern = negated ? globPattern.slice(1) : globPattern;
+				const resolved = resolve(configDir, pattern.startsWith('/') ? pattern.slice(1) : pattern);
+				const relativePath = relative(configDir, resolved);
+				if (
+					relativePath === '..' ||
+					relativePath.startsWith(`..${sep}`) ||
+					isAbsolute(relativePath)
+				) {
+					// Patterns outside the configuration directory are intentionally ignored.
+					continue;
 				}
-				const resolved = resolve(configDir, g.startsWith('/') ? g.slice(1) : g);
-				if (relative(configDir, resolved).startsWith('..')) {
-					return [];
-				}
-				return [resolved];
-			});
-			return globSync(resolvedGlobs) as string[];
+				resolvedGlobs.push(negated ? `!${resolved}` : resolved);
+			}
+
+			const matchedFiles: string[] = [];
+			for await (const filePath of glob(resolvedGlobs)) {
+				matchedFiles.push(filePath);
+			}
+			return matchedFiles;
 		},
 
 		loadConfigFile: async (filePath: string) => {
@@ -128,5 +156,5 @@ export async function loadConfiguration(
 		},
 	};
 
-	return mergeConfiguration(config, mergeOptions);
+	return mergeConfiguration(config as Configuration, mergeOptions);
 }

@@ -1,16 +1,37 @@
 import type { Configuration, StructureValue } from '@cloudcannon/configuration-types';
+import {
+	ConfigurationLoadError,
+	InvalidGlobPatternError,
+	invalidConfigurationError,
+	invalidConfigurationValueError,
+} from './errors.ts';
 import type {
+	FindFilesMatchingGlobs,
 	GlobLoaderWarnings,
 	GlobResult,
 	GlobTypeKey,
 	MergeConfigurationOptions,
 } from './types.ts';
+import { isObject } from './utils.ts';
 
-export type { GlobLoaderWarnings, GlobResult, GlobTypeKey, MergeConfigurationOptions };
-
-function isObject<T = unknown>(maybeObject?: unknown): maybeObject is Record<string, T> {
-	return maybeObject !== null && typeof maybeObject === 'object' && !Array.isArray(maybeObject);
+// Define keys as own data properties so a user-supplied "__proto__" key cannot
+// change the prototype of the merged object.
+function defineOwnProperty(target: Record<string, unknown>, key: string, value: unknown): void {
+	Object.defineProperty(target, key, {
+		value,
+		enumerable: true,
+		configurable: true,
+		writable: true,
+	});
 }
+
+export type {
+	FindFilesMatchingGlobs,
+	GlobLoaderWarnings,
+	GlobResult,
+	GlobTypeKey,
+	MergeConfigurationOptions,
+};
 
 class ConfigurationLoader {
 	warnings: GlobLoaderWarnings;
@@ -30,12 +51,14 @@ class ConfigurationLoader {
 
 	globPatterns: Set<string>;
 
-	findFilesMatchingGlobs: (globs: string[]) => string[];
+	findFilesMatchingGlobs: FindFilesMatchingGlobs;
 	loadConfigFile: (filePath: string) => Promise<unknown>;
+	configPath?: string;
 
 	constructor(
-		findFilesMatchingGlobs: (globs: string[]) => string[],
-		loadConfigFile: (filePath: string) => Promise<unknown>
+		findFilesMatchingGlobs: FindFilesMatchingGlobs,
+		loadConfigFile: (filePath: string) => Promise<unknown>,
+		configPath?: string
 	) {
 		this.warnings = {
 			cycles: [],
@@ -45,6 +68,7 @@ class ConfigurationLoader {
 		this.globPatterns = new Set();
 		this.findFilesMatchingGlobs = findFilesMatchingGlobs;
 		this.loadConfigFile = loadConfigFile;
+		this.configPath = configPath;
 	}
 
 	/**
@@ -352,30 +376,72 @@ class ConfigurationLoader {
 			return;
 		}
 
-		globs.forEach((pattern) => {
-			if (typeof pattern === 'string' && !pattern.startsWith('!')) {
+		const patterns = this.validateGlobPatterns(globs);
+		patterns.forEach((pattern) => {
+			if (!pattern.startsWith('!')) {
 				this.globPatterns.add(pattern);
 			}
 		});
-		const loadedDataWithSources = await this.loadFilesFromGlobs(
-			globs as string[],
-			globKey,
-			visited
-		);
+		const loadedDataWithSources = await this.loadFilesFromGlobs(patterns, globKey, visited);
+
+		const existingValue = config[targetKey];
 
 		if (isArray) {
+			if (existingValue !== undefined && existingValue !== null && !Array.isArray(existingValue)) {
+				throw invalidConfigurationValueError(
+					`expected "${targetKey}" to be an array because "${globKey}" is set`,
+					this.configPath
+				);
+			}
 			config[targetKey] = this.mergeArrayValues(
-				(config[targetKey] || []) as unknown[],
+				Array.isArray(existingValue) ? existingValue : [],
 				loadedDataWithSources
 			);
 		} else {
+			if (existingValue !== undefined && existingValue !== null && !isObject(existingValue)) {
+				throw invalidConfigurationValueError(
+					`expected "${targetKey}" to be an object because "${globKey}" is set`,
+					this.configPath
+				);
+			}
 			config[targetKey] = this.mergeObjectValues(
-				(config[targetKey] || {}) as Record<string, unknown>,
+				isObject(existingValue) ? existingValue : {},
 				loadedDataWithSources
 			);
 		}
 
 		delete config[globKey];
+	}
+
+	private validateGlobPatterns(patterns: unknown[]): string[] {
+		for (const pattern of patterns) {
+			if (typeof pattern !== 'string') {
+				throw new InvalidGlobPatternError(pattern, {
+					filePath: this.configPath,
+					reason: 'expected a string',
+				});
+			}
+			if (pattern.length === 0) {
+				throw new InvalidGlobPatternError(pattern, {
+					filePath: this.configPath,
+					reason: 'cannot be empty',
+				});
+			}
+			if (pattern.includes('\0')) {
+				throw new InvalidGlobPatternError(pattern, {
+					filePath: this.configPath,
+					reason: 'cannot contain NUL bytes',
+				});
+			}
+			if (pattern === '!') {
+				throw new InvalidGlobPatternError(pattern, {
+					filePath: this.configPath,
+					reason: 'has no pattern after "!"',
+				});
+			}
+		}
+
+		return patterns as string[];
 	}
 
 	/**
@@ -387,9 +453,9 @@ class ConfigurationLoader {
 		globKey: GlobTypeKey,
 		visited?: Set<string>
 	): Promise<Array<{ data: unknown; source: string }>> {
-		const matchingFiles = this.findFilesMatchingGlobs(globs);
-		// Sort by path to ensure consistent ordering
-		matchingFiles.sort((a, b) => a.localeCompare(b));
+		const matchingFiles = (await this.findFilesMatchingGlobs(globs)).toSorted((a, b) =>
+			a.localeCompare(b)
+		);
 		const loadedData: Array<{ data: unknown; source: string }> = [];
 
 		for (const filePath of matchingFiles) {
@@ -411,7 +477,7 @@ class ConfigurationLoader {
 				continue;
 			}
 
-			this.pathsToGlobKey[filePath] = globKey;
+			defineOwnProperty(this.pathsToGlobKey, filePath, globKey);
 			this.globKeyToPaths[globKey].add(filePath);
 
 			visited?.add(filePath);
@@ -457,14 +523,14 @@ class ConfigurationLoader {
 				for (const [key, value] of Object.entries(item)) {
 					if (isObject(value)) {
 						// Add __source__ to nested objects (e.g., input definitions, schema configs)
-						result[key] = {
+						defineOwnProperty(result, key, {
 							...value,
 							__source__: source,
-						};
+						});
 					} else {
 						// For primitive values, just assign the value
 						// The source is tracked at the key level via __sources__ if needed
-						result[key] = value;
+						defineOwnProperty(result, key, value);
 					}
 				}
 			}
@@ -580,14 +646,32 @@ function removeDuplicateWarnings(warnings: GlobLoaderWarnings): GlobLoaderWarnin
  * console.log(result.config); // Merged configuration
  * ```
  */
+function cloneConfiguration(config: Configuration, filePath?: string): Configuration {
+	try {
+		return JSON.parse(JSON.stringify(config)) as Configuration;
+	} catch (err) {
+		const location = filePath ? ` in "${filePath}"` : '';
+		throw new ConfigurationLoadError(`Configuration${location} is not JSON-serializable.`, {
+			cause: err,
+			filePath,
+		});
+	}
+}
+
 export async function mergeConfiguration(
 	config: Configuration,
 	options: MergeConfigurationOptions
 ): Promise<GlobResult> {
-	const loader = new ConfigurationLoader(options.findFilesMatchingGlobs, options.loadConfigFile);
-	const result = await loader.mergeConfiguration(
-		JSON.parse(JSON.stringify(config)) as Configuration
+	if (!isObject(config)) {
+		throw invalidConfigurationError(config);
+	}
+
+	const loader = new ConfigurationLoader(
+		options.findFilesMatchingGlobs,
+		options.loadConfigFile,
+		options.configPath
 	);
+	const result = await loader.mergeConfiguration(cloneConfiguration(config, options.configPath));
 
 	return {
 		config: result,

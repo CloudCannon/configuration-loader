@@ -82,6 +82,8 @@ const result = await loadConfiguration('cloudcannon.config.yml');
 - `configPath` - Path to the CloudCannon configuration file
 - `options.parseFile` - Optional custom parser function for file contents
 
+Throws a `ConfigurationLoadError` if the file cannot be read or parsed, or if it does not contain a top-level object.
+
 #### Returns
 
 ### `mergeConfiguration(config, options)`
@@ -100,8 +102,10 @@ const result = await mergeConfiguration(config, {
 #### Parameters
 
 - `config` - The base CloudCannon configuration object
-- `options.findFilesMatchingGlobs` - Function that takes an array of glob patterns and returns matching file paths
+- `options.findFilesMatchingGlobs` - Function that takes an array of glob patterns and returns (or resolves to) matching file paths. May be sync or async.
 - `options.loadConfigFile` - Async function that loads and parses a configuration file
+
+Throws a `ConfigurationLoadError` if `config` is not an object.
 
 #### Returns
 
@@ -132,6 +136,13 @@ interface GlobResult {
   globKeyToPaths: Record<GlobTypeKey, Set<string>>;
 }
 ```
+
+## Errors
+
+Invalid input configuration throws a subclass of `ConfigurationError`:
+
+- `ConfigurationLoadError` — the file could not be read or parsed, did not contain a top-level object, is not JSON-serializable (for example, circular YAML anchors), or has incompatible values for a `*_from_glob` merge.
+- `InvalidGlobPatternError` — a `*_from_glob` entry is malformed (not a string, empty, contains NUL bytes, or a bare `!`).
 
 ## Browser Usage
 
@@ -212,4 +223,3 @@ This package uses Node.js 22's native TypeScript support with type stripping (`-
 ## License
 
 MIT
-
